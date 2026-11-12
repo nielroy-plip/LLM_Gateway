@@ -1,0 +1,23 @@
+{
+  "name": "@gateway/core",
+  "version": "1.0.0",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.4.1",
+    "axios": "^1.21.1",
+    "dotenv": "^16.6.1",
+    "fastify": "^5.12.8",
+    "opossum": "^8.5.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "@types/opossum": "^8.1.9",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}
