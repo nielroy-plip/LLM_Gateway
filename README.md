@@ -1,166 +1,64 @@
 # 🛡️ LLM Resilience Gateway
 
-Um proxy reverso inteligente e resiliente projetado para atuar como camada de infraestrutura entre aplicações cliente e Modelos de Linguagem (LLMs). O gateway prioriza a execução local via **Ollama** para reduzir custos e garantir privacidade, conta com sanitização automática de dados sensíveis (**PII Redaction**) e aplica o padrão **Circuit Breaker** com fallback automático para APIs em nuvem.
+Um Gateway de Inteligência Artificial resiliente, de baixo custo e com foco em privacidade, desenvolvido em **Node.js/Fastify**, **Ollama (Local)** e **Next.js**. 
+
+O projeto resolve dores reais de adoção de LLMs locais em produção[cite: 4]: **indisponibilidade de hardware, vazamento de dados sensíveis (PII) e falta de visibilidade financeira (FinOps)**.
 
 ---
 
-## 🎯 Problema Resolvido
+## 🚀 Arquitetura e Componentes
 
-Em ambientes de produção, o consumo direto de LLMs apresenta três desafios críticos:
-1. **Privacidade e Compliance (LGPD/GDPR):** Vazamento acidental de dados sensíveis (CPFs, e-mails, chaves de API, cartões) nos prompts enviados a provedores externos.
-2. **Custos Elevados:** Dependência exclusiva de APIs pagas por token para tarefas que poderiam ser resolvidas localmente.
-3. **Instabilidade e Latência:** Falhas ou lentidão em modelos locais que podem derrubar a experiência do usuário final caso não haja contingência.
+1. **API Gateway (`/apps/gateway`)**:
+   - Backend em **Node.js + Fastify** com compatibilidade de payload.
+   - **Circuit Breaker (`Opossum`)**: Monitora falhas e timeouts do Ollama local, chaveando automaticamente para um provedor de nuvem em caso de degradação.
+   - **Sanitizador de PII (Regex)**: Detecta e mascará dados sensíveis antes de enviá-los ao modelo (CPF, CNPJ, E-mail, Cartões de Crédito e Telefones).
+   - **Buffer de Telemetria (`MetricsStore`)**: Coleta métricas em tempo real de latência, taxas de roteamento e impactos financeiros.
 
----
+2. **IA Local (`Ollama`)**:
+   - Orquestrado via Docker com o modelo `llama3.2:latest`, garantindo privacidade de dados e custo operacional zero nas requisições padrão.
 
-## 🏗️ Arquitetura e Fluxo de Dados
-
-```text
-[ Cliente / Aplicação ]
-         │
-         ▼
-┌─────────────────────────────────────────┐
-│           API Gateway Core              │  <-- Contrato compatível com OpenAI
-│       (Node.js + Fastify + TS)          │      POST /v1/chat/completions
-└────────────────────┬────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────┐
-│          PII Sanitizer Engine           │  <-- Interceptação e mascaramento
-│         (Regex / Data Redaction)        │      (CPF, E-mail, Cartões, Keys)
-└────────────────────┬────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────┐
-│        Policy & Routing Engine          │  <-- Gerenciamento de falhas e timeout
-│       (Circuit Breaker - Opossum)       │      (Closed / Open / Half-Open)
-└──────┬───────────────────────────┬──────┘
-       │                           │
-       ▼ (Primary)                 ▼ (Fallback)
-┌──────────────┐            ┌──────────────┐
-│ Local Ollama │            │ Cloud LLM API│
-│  (llama3)    │            │ (Contingência)│
-└──────────────┘            └──────────────┘
-```
-
-### Ciclo de Vida da Requisição
-1. **Interceptação:** O gateway recebe requisições no padrão `POST /v1/chat/completions`.
-2. **Sanitização (PII):** O motor analisa cada mensagem e substitui dados confidenciais por marcadores seguros (ex: `[REDACTED_CPF]`, `[REDACTED_EMAIL]`) antes que o prompt saia do servidor.
-3. **Roteamento Resiliente:** O **Circuit Breaker** encaminha o prompt limpo para a instância local do **Ollama**.
-4. **Fallback Automático:** Caso o Ollama esteja indisponível, retorne erro ou ultrapasse o limite de tempo (*timeout*), o circuito aciona a rota de fallback automaticamente, mantendo a disponibilidade da aplicação.
+3. **Dashboard de Observabilidade (`/apps/dashboard`)**:
+   - Interface moderna em **Next.js 14/16 + Tailwind CSS**.
+   - Exibe em tempo real o estado do Circuit Breaker, taxa de roteamento local vs. nuvem, latência integrada e painel de FinOps (Economia Gerada vs. Custo de Fallback sugerido por feedbacks da comunidade)[cite: 4].
 
 ---
 
-## 🛠️ Stack Tecnológica
-
-* **Runtime & Linguagem:** Node.js, TypeScript
-* **Framework Web:** Fastify v5 + `@fastify/cors`
-* **Resiliência:** Opossum (Circuit Breaker Pattern)
-* **Cliente HTTP:** Axios (com controle estrito de *timeouts*)
-* **Motor de IA Local:** Ollama (`llama3:latest`)
+## 📊 Principais Métricas e FinOps
+* **Taxa de Roteamento Local**: Porcentagem de requisições atendidas pelo Ollama sem custo de nuvem.
+* **Cost Avoidance (Economia)**: Cálculo estimado do valor economizado com base no volume de tokens processados localmente.
+* **Custo de Fallback**: Monitoramento financeiro do impacto gerado durante janelas de indisponibilidade do modelo local.
+* **Auditoria de PII**: Identificação e contagem de tipos de dados sensíveis bloqueados por requisição.
 
 ---
 
-## 📂 Estrutura Atual do Projeto
-
-```text
-llm-resilience-gateway/
-├── apps/
-│   └── gateway/                  # Core do Proxy & Resiliência
-│       ├── src/
-│       │   ├── middlewares/
-│       │   │   └── piiSanitizer.ts       # Motor de anonimização de dados sensíveis
-│       │   ├── resilience/
-│       │   │   └── circuitBreaker.ts     # Configuração do Opossum e lógica de Fallback
-│       │   ├── services/
-│       │   │   ├── ollamaService.ts      # Integração com a API local do Ollama
-│       │   │   └── cloudLlmService.ts    # Provedor de contingência em nuvem
-│       │   └── server.ts                 # Rotas da API e inicialização do Fastify
-│       ├── .env                          # Variáveis de ambiente
-│       ├── package.json
-│       └── tsconfig.json
-└── README.md
-```
-
----
-
-## 🚀 Como Executar Localmente
+## 🛠️ Como Executar o Projeto
 
 ### Pré-requisitos
-* **Node.js** (v20+)
-* **Ollama** instalado e em execução localmente com o modelo `llama3` baixado:
-  ```bash
-  ollama pull llama3
-  ```
+- Docker & Docker Compose instalados.
+- Node.js 20+ (caso queira rodar o dashboard localmente).
 
-### 1. Instalação das Dependências
-Acesse a pasta do gateway e instale os pacotes:
+### 1. Subir o Gateway e o Ollama (Docker)
+Na raiz do projeto, execute:
 ```bash
-cd apps/gateway
+docker compose up --build -d
+(O Ollama subirá na porta 11434 ou 11435 e o Gateway na porta 3001).
+
+2. Baixar o modelo no container do Ollama (primeira execução)
+Bash
+docker exec -it ollama-local ollama pull llama3.2:latest
+
+3. Iniciar o Dashboard Frontend
+Em um novo terminal, navegue até a pasta do painel, instale as dependências e inicie:
+
+Bash
+cd apps/dashboard
 npm install
-```
-
-### 2. Configuração de Ambiente
-Crie um arquivo `.env` na raiz de `apps/gateway` com as seguintes variáveis:
-```env
-PORT=3001
-OLLAMA_URL=http://127.0.0.1:11434
-OLLAMA_MODEL=llama3:latest
-OPENAI_API_KEY=
-```
-
-### 3. Iniciar o Servidor
-```bash
 npm run dev
-```
-O servidor estará disponível em `http://127.0.0.1:3001`.
+Acesse o painel em http://localhost:3000.
 
----
+🔌 Endpoints Principais da API (Porta 3001)
+POST /v1/chat/completions - Envia prompts com sanitização automática de PII e proteção de Circuit Breaker.
 
-## 🧪 Testando os Recursos
+GET /api/stats - Retorna o estado atual do circuito e os KPIs consolidados.
 
-### 1. Testar Chat com Sanitização de PII
-Envie uma requisição contendo dados fictícios (CPF e e-mail) para validar a anonimização e o roteamento para o Ollama:
-
-```bash
-curl -X POST http://localhost:3001/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "messages": [
-      {
-        "role": "user",
-        "content": "Olá, meu nome é Lucas, meu CPF é 123.456.789-00 e meu email é lucas@teste.com. Me explique o padrão Circuit Breaker em uma frase."
-      }
-    ]
-  }'
-```
-
-**Exemplo de Resposta:**
-```json
-{
-  "status": "success",
-  "providerUsed": "OLLAMA_LOCAL",
-  "latencyMs": 1420,
-  "piiSanitized": true,
-  "message": {
-    "role": "assistant",
-    "content": "O padrão Circuit Breaker protege sistemas distribuídos interrompendo chamadas a serviços com falhas recorrentes para evitar falhas em cascata."
-  }
-}
-```
-
-### 2. Consultar Estado do Circuit Breaker
-```bash
-curl http://localhost:3001/api/circuit-status
-```
-
----
-
-## 🗺️ Roadmap do Projeto
-
-- [x] Proxy compatível com formato OpenAI (`/v1/chat/completions`)
-- [x] Motor de sanitização de PII (CPF, E-mail, Cartão de Crédito, API Keys)
-- [x] Circuit Breaker com Fallback automático (Ollama -> Cloud)
-- [ ] Containerização com Docker e `docker-compose.yml` (Gateway + Ollama)
-- [ ] Coleta de métricas de economia e latência (`/api/stats`)
-- [ ] Dashboard Web de Observabilidade em tempo real (Next.js)
+GET /api/logs - Retorna o buffer circular com as últimas requisições auditadas.

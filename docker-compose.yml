@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  gateway:
+    build:
+      context: ./apps/gateway
+      dockerfile: Dockerfile
+    container_name: llm_resilience_gateway
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=llama3.2:latest
+    depends_on:
+      - ollama
+    networks:
+      - llm-network
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-local
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - llm-network
+    restart: unless-stopped
+
+volumes:
+  ollama_data: {}
+
+networks:
+  llm-network:
+    driver: bridge

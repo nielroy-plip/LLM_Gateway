@@ -9,7 +9,7 @@ export interface ExecutionResult {
 }
 
 const options: CircuitBreaker.Options = {
-    timeout: 30000, //Se o Ollama demorar > 30s, considera falha
+    timeout: 90000, //Se o Ollama demorar > 90s, considera falha
     errorThresholdPercentage: 50, //Se 50% das requisições falharem, abre o circuido
     resetTimeout: 10000 // Após 10s, tenta fechar o circuito novamente (half-open) 
 };
