@@ -9,7 +9,7 @@ export interface ExecutionResult {
 }
 
 const options: CircuitBreaker.Options = {
-    timeout: 90000, //Se o Ollama demorar > 90s, considera falha
+    timeout: 60000, // 60 segundos (evita falso-positivo na primeira carga do modelo)
     errorThresholdPercentage: 50, //Se 50% das requisições falharem, abre o circuido
     resetTimeout: 10000 // Após 10s, tenta fechar o circuito novamente (half-open) 
 };
@@ -64,5 +64,13 @@ export class ResilienceModule {
             state: breaker.opened ? 'OPEN' : breaker.halfOpen ? 'HALF_OPEN' : 'CLOSED',
             stats: breaker.stats
         };
+    };
+
+    static forceOpen() {
+        breaker.open();
+    }
+
+    static forceClose() {
+        breaker.close();
     }
 }

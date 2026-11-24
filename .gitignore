@@ -5,3 +5,6 @@
 #Arquivos de biblioteca
 node_modules
 dist
+
+
+.next

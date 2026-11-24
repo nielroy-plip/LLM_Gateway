@@ -16,7 +16,7 @@ export class OllamaService {
                 model: this.DEFAULT_MODEL,
                 messages: messages,
                 stream: false,
-                keep_alive: '10m', // Mantém a conexão ativa por 10 minutos
+                keep_alive: '30m', // Mantém a conexão ativa por 30 minutos
                 options: {
                     num_predict: 150 // Limite de respostas a ~150 tokens para evitar latência
                 }

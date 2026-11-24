@@ -111,6 +111,16 @@ app.get('/api/circuit-status', async () => {
   return ResilienceModule.getStatus();
 });
 
+app.post<{ Body: { action: 'OPEN' | 'CLOSE' } }>('/api/chaos/circuit', async (request, reply) => {
+  const { action } = request.body;
+  if (action === 'OPEN') {
+    ResilienceModule.forceOpen();
+    return reply.send({ status: 'Circuit Breaker forçado para OPEN (Simulação de Caos)' });
+  }
+  ResilienceModule.forceClose();
+  return reply.send({ status: 'Circuit Breaker restaurado para CLOSED' });
+});
+
 app.get('/api/stats', async () => {
   return {
     circuit: ResilienceModule.getStatus(),
